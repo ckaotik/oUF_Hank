@@ -1,4 +1,4 @@
-local oUF_Hank = {}
+local _, oUF_Hank = ...
 local cfg = oUF_Hank_config
 
 -- GLOBALS: oUF_player, oUF_pet, oUF_target, oUF_focus
