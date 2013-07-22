@@ -104,6 +104,7 @@ oUF.Tags.Events["threatPerc"] = "UNIT_THREAT_SITUATION_UPDATE"
 oUF.Tags.Methods["threatPerc"] = function(unit)
 	local _, _, scaledPercent, _, _ = UnitDetailedThreatSituation("player", unit)
 	if scaledPercent then
+		if scaledPercent > 100 then scaledPercent = 100 end
 		if cfg.ColorThreat then
 			return ("|| |cFF%.2x%.2x%.2x%d%%|r"):format(255 * 0.75 * scaledPercent / 100, 255 * 0.75 - (255 * 0.75 * scaledPercent / 100), 0, scaledPercent)
 		else
@@ -119,7 +120,7 @@ oUF.Tags.Events["threatBoss"] = "UNIT_THREAT_LIST_UPDATE"
 oUF.Tags.Methods["threatBoss"] = function(unit)
 	if GetNumGroupMembers() > 0 or GetNumSubgroupMembers() > 0 then
 		local prefix, num = GetNumGroupMembers() > 0 and "raid" or "party", GetNumGroupMembers() > 0 and GetNumGroupMembers() or GetNumSubgroupMembers()
-		local isTanking, _, _, scaledPercent = UnitDetailedThreatSituation("player", unit)
+		local isTanking, _, scaledPercent = UnitDetailedThreatSituation("player", unit)
 		if isTanking then
 			local highestThreat, highestThreatUnit = 0, nil
 			for i = 1, num do
@@ -138,12 +139,14 @@ oUF.Tags.Methods["threatBoss"] = function(unit)
 				return "You"
 			else
 				if cfg.ColorThreat then
+					highestThreat = (highestThreat or 0) < 100 and highestThreat or 100
 					return ("%s @|cFF%.2x%.2x%.2x%d%%|r \194\171 You"):format(UnitName(highestThreatUnit), 255 * 0.75 * (highestThreat or 0) / 100, 255 * 0.75 - (255 * 0.75 * (highestThreat or 0) / 100), 0, highestThreat or 0)
 				else
 					return ("%s @%d%% \194\171 You"):format(UnitName(highestThreatUnit), highestThreat or 0)
 				end
 			end
 		else
+			scaledPercent = (scaledPercent or 0) < 100 and (scaledPercent or 0) or 100
 			for i = 1, num do
 				local isTanking = UnitDetailedThreatSituation(prefix .. i, unit)
 				if isTanking then
@@ -166,8 +169,8 @@ oUF.Tags.Methods["threatBoss"] = function(unit)
 		end
 	elseif UnitName("pet") then
 		-- Solo with pet
-		local isTanking, _, _, scaledPercentPlayer = UnitDetailedThreatSituation("player", unit)
-		local _, _, _, scaledPercentPet = UnitDetailedThreatSituation("pet", unit)
+		local isTanking, _, scaledPercentPlayer = UnitDetailedThreatSituation("player", unit)
+		local _, _, scaledPercentPet = UnitDetailedThreatSituation("pet", unit)
 		if isTanking then
 			if cfg.ColorThreat then
 				return ("%s @|cFF%.2x%.2x%.2x%d%%|r \194\171 You"):format(UnitName("pet"), 255 * 0.75 * (scaledPercentPet or 0) / 100, 255 * 0.75 - (255 * 0.75 * (scaledPercentPet or 0) / 100), 0, scaledPercentPet or 0)
