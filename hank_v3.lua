@@ -2,7 +2,7 @@ local _, oUF_Hank = ...
 local cfg = oUF_Hank_config
 
 -- GLOBALS: oUF_player, oUF_pet, oUF_target, oUF_focus
--- GLOBALS: _G, MIRRORTIMER_NUMTIMERS, SPELL_POWER_HOLY_POWER, MAX_TOTEMS, MAX_COMBO_POINTS, DebuffTypeColor, SPEC_WARLOCK_DEMONOLOGY
+-- GLOBALS: _G, MIRRORTIMER_NUMTIMERS, SPELL_POWER_HOLY_POWER, MAX_TOTEMS, MAX_COMBO_POINTS, DebuffTypeColor
 -- GLOBALS: ToggleDropDownMenu, UnitIsUnit, GetTime, AnimateTexCoords, GetEclipseDirection, MirrorTimerColors, GetSpecialization, UnitHasVehicleUI, UnitHealth, UnitHealthMax, UnitPower, UnitIsDead, UnitIsGhost, UnitIsConnected, UnitAffectingCombat, GetLootMethod, UnitIsGroupLeader, UnitIsPVPFreeForAll, UnitIsPVP, UnitInRaid, IsResting, UnitAura, UnitCanAttack, UnitIsGroupAssistant, GetRuneCooldown, UnitClass, CancelUnitBuff, CreateFrame, IsAddOnLoaded, UnitFrame_OnEnter, UnitFrame_OnLeave
 local unpack = unpack
 local pairs = pairs
@@ -54,18 +54,11 @@ oUF_Hank.classResources = {
 		active = {'Interface\\PlayerFrame\\Priest-ShadowUI', { 116/256, 152/256, 57/128, 94/128 }},
 		size = {28, 28},
 	},
+	-- handled differently
 	['SHAMAN'] = {
 		inactive = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\blank.blp', { 0, 23/128, 0, 20/32 }},
 		active = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\totems.blp', { (1+23)/128, ((23*2)+1)/128, 0, 20/32 }},
 		size = {23, 20},
-		spacing = -3,
-		inverse = true,
-	},
-	['WARLOCK'] = {
-		inactive = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\shard_bg.blp'},
-		active = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\shard.blp'},
-		size = {16, 16},
-		spacing = 5,
 	}
 }
 
@@ -85,7 +78,6 @@ fntSmall:SetShadowOffset(1, -1)
 local canDispel = {}
 
 -- Functions -------------------------------------
-
 -- Unit menu
 oUF_Hank.menu = function(self)
 	local unit = self.unit:sub(1, -2)
@@ -526,9 +518,10 @@ end
 -- Frame constructor -----------------------------
 
 oUF_Hank.sharedStyle = function(self, unit, isSingle)
-	self.menu = oUF_Hank.menu
 	self:SetScript("OnEnter", UnitFrame_OnEnter)
 	self:SetScript("OnLeave", UnitFrame_OnLeave)
+
+	self.menu = oUF_Hank.menu
 	self:RegisterForClicks("AnyDown")
 	self:SetAttribute("*type2", "menu")
 
@@ -1015,36 +1008,13 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 		end
 	end
 
-	-- Warlock secondary resource (requires oUF_WarlockSpecBars)
-	local showWarlockBar = playerClass == "WARLOCK" and IsAddOnLoaded("oUF_WarlockSpecBars")
-	if unit == "player" and showWarlockBar then
-		initClassIcons = function(unitFrame)
-			local data = oUF_Hank.classResources[playerClass]
-			local wb = CreateFrame("Frame", "oUFHank_WarlockSpecBar", unitFrame)
-			wb:SetPoint("TOPRIGHT", self, "BOTTOMRIGHT", 0, 0)
-			wb:SetSize(90, data.size[2])
-
-			wb.PostUpdate = function(icons, spec)
-				if spec == SPEC_WARLOCK_DEMONOLOGY then
-					icons[1]:SetOrientation("HORIZONTAL")
-					icons[1]:SetSize(data.size[1] * 4, data.size[2] / 4)
-					icons[1]:SetStatusBarTexture('Interface\\AddOns\\oUF_Hank_v3\\textures\\flat.blp')
-				else
-					icons[1]:SetOrientation("VERTICAL")
-					icons[1]:SetSize(data.size[1], data.size[2])
-					icons[1]:SetStatusBarTexture(data['active'][1])
-
-					for i=1,4 do
-						-- wtf, don't assume everyone wants automagic partitioning!
-						icons[i]:SetSize(data.size[1], data.size[2])
-					end
-				end
-			end
-			unitFrame.WarlockSpecBars = wb
-		end
-		initClassSingleIcon = function(unitFrame, i)
-			local data = oUF_Hank.classResources[playerClass]
-		end
+	-- Soul Shards / Burning Embers / Demonic Fury (reuse Blizzard's)
+	if unit == "player" and playerClass == "WARLOCK" then
+		local extra = _G["WarlockPowerFrame"]
+		extra:SetScale(0.6)
+		extra:SetParent(self)
+		extra:ClearAllPoints()
+		extra:SetPoint("TOPRIGHT", self, "BOTTOMRIGHT", -16, 2)
 	end
 
 	-- Totems (requires oUF_TotemBar)
@@ -1150,10 +1120,9 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 		end
 	end
 
-	-- StatusBarIcons: Totems / Soul Shards / Burning Embers / Demonic Fury
-	if unit == "player" and (showTotemBar or showWarlockBar) then
+	-- StatusBarIcons: Totems
+	if unit == "player" and showTotemBar then
 		local data = oUF_Hank.classResources[playerClass]
-		local displayType = showTotemBar and "TotemBar" or "WarlockSpecBars"
 
 		if initClassIcons then
 			initClassIcons(self)
@@ -1176,13 +1145,12 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 			icon.backdrop = backdrop
 
 			if i == 1 then
-				icon:SetPoint(data.inverse and "TOPRIGHT" or "TOPLEFT", self, "BOTTOMRIGHT", data.offset or -90, 0)
+				icon:SetPoint("TOPLEFT", self, "BOTTOMRIGHT", -1*data.size[1]*4, 0)
 			else
-				icon:SetPoint(data.inverse and "RIGHT" or "LEFT", self[displayType][i - 1], data.inverse and "LEFT" or "RIGHT", data.spacing or 0,
-					0)
+				icon:SetPoint("LEFT", self.TotemBar[i - 1], "RIGHT", data.spacing or 0, 0)
 			end
 
-			self[displayType][i] = icon
+			self.TotemBar[i] = icon
 
 			if initClassSingleIcon then
 				initClassSingleIcon(self, i, icon)
@@ -1192,7 +1160,7 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 			end
 		end
 	-- ClassIcons: Harmony Orbs / Shadow Orbs / Holy Power
-	elseif unit == "player" and (playerClass == "MONK" or playerClass == "PRIEST" or playerClass == "PALADIN" or playerClass == "WARLOCK") then
+	elseif unit == "player" and (playerClass == "MONK" or playerClass == "PRIEST" or playerClass == "PALADIN") then
 		local data = oUF_Hank.classResources[playerClass]
 		local bg = {}
 		self.ClassIcons = {}
@@ -1216,15 +1184,9 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 			bg[i].tex:SetAllPoints(bg[i])
 
 			if i == 1 then
-				bg[i]:SetPoint("TOPRIGHT", self, "BOTTOMRIGHT", data.offset or -78, 0)
+				bg[i]:SetPoint("TOPLEFT", self, "BOTTOMRIGHT", -1*(data.size[1] or 28)*5, 0)
 			else
-				bg[i]:SetPoint(
-					data.inverse and "RIGHT" or "LEFT",
-					bg[i - 1],
-					data.inverse and "LEFT" or "RIGHT",
-					data.spacing or 0,
-					0
-				)
+				bg[i]:SetPoint("LEFT", bg[i - 1], "RIGHT", 0, 0)
 			end
 
 			self.ClassIcons[i] = bg[i]:CreateTexture(nil, "OVERLAY")
