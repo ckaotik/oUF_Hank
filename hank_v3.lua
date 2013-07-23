@@ -167,7 +167,7 @@ oUF_Hank.UpdateHealth = function(self)
 	local status = (not UnitIsConnected(self.unit) or nil) and "Off" or UnitIsGhost(self.unit) and "G" or UnitIsDead(self.unit) and "X"
 
 	if not status then
-		local hPerc = ("%d%%"):format(h / hMax * 100 + 0.5)
+		local hPerc = (cfg.HealthFormat):format(h / hMax * 100 + 0.5)
 		local len = strlen(hPerc)
 
 		if self.unit:find("boss") then
