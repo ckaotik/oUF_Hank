@@ -1,3 +1,4 @@
+local _, oUF_Hank = ...
 local cfg = oUF_Hank_config
 oUF_Hank_hooks = {}
 
