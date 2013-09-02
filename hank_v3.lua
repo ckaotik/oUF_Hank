@@ -4,18 +4,11 @@ local cfg = oUF_Hank_config
 -- GLOBALS: oUF_player, oUF_pet, oUF_target, oUF_focus
 -- GLOBALS: _G, MIRRORTIMER_NUMTIMERS, SPELL_POWER_HOLY_POWER, MAX_TOTEMS, MAX_COMBO_POINTS, DebuffTypeColor
 -- GLOBALS: ToggleDropDownMenu, UnitIsUnit, GetTime, AnimateTexCoords, GetEclipseDirection, MirrorTimerColors, GetSpecialization, UnitHasVehicleUI, UnitHealth, UnitHealthMax, UnitPower, UnitIsDead, UnitIsGhost, UnitIsConnected, UnitAffectingCombat, GetLootMethod, UnitIsGroupLeader, UnitIsPVPFreeForAll, UnitIsPVP, UnitInRaid, IsResting, UnitAura, UnitCanAttack, UnitIsGroupAssistant, GetRuneCooldown, UnitClass, CancelUnitBuff, CreateFrame, IsAddOnLoaded, UnitFrame_OnEnter, UnitFrame_OnLeave
-local unpack = unpack
-local pairs = pairs
-local ipairs = ipairs
-local select = select
-local tinsert = table.insert
-local ceil = math.ceil
-local floor = math.floor
-local upper = string.upper
-local strlen = string.len
-local strsub = string.sub
-local gmatch = string.gmatch
-local match = string.match
+local upper, strlen, strsub, gmatch, match = string.upper, string.len, string.sub, string.gmatch, string.match
+local unpack, pairs, ipairs, select, tinsert = unpack, pairs, ipairs, select, table.insert
+local ceil, floor = math.ceil, math.floor
+
+local LibMasque = LibStub("Masque", true)
 
 oUF_Hank.digitTexCoords = {
 	["1"] = {1, 20},
@@ -54,12 +47,13 @@ oUF_Hank.classResources = {
 		active = {'Interface\\PlayerFrame\\Priest-ShadowUI', { 116/256, 152/256, 57/128, 94/128 }},
 		size = {28, 28},
 	},
-	-- handled differently
+	-- totems are handled differently
 	['SHAMAN'] = {
 		inactive = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\blank.blp', { 0, 23/128, 0, 20/32 }},
 		active = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\totems.blp', { (1+23)/128, ((23*2)+1)/128, 0, 20/32 }},
 		size = {23, 20},
 	}
+	-- TODO: druid mushrooms
 }
 
 local fntBig = CreateFont("UFFontBig")
@@ -87,9 +81,9 @@ oUF_Hank.menu = function(self)
 	if self == oUF_player and cunit=="Vehicle" then cunit = "Player" end
 	if self == oUF_pet and cunit=="Player" then cunit = "Pet" end
 
-	if(unit == "party" or unit == "partypet") then
+	if unit == "party" or unit == "partypet" then
 		ToggleDropDownMenu(nil, nil, _G["PartyMemberFrame"..self.id.."DropDown"], "cursor", 0, 0)
-	elseif(_G[cunit.."FrameDropDown"]) then
+	elseif _G[cunit.."FrameDropDown"] then
 		ToggleDropDownMenu(nil, nil, _G[cunit.."FrameDropDown"], "cursor", 0, 0)
 	end
 end
@@ -311,6 +305,11 @@ oUF_Hank.PostUpdateIcon = function(icons, unit, icon, index, offset)
 		icon.icon:SetVertexColor(1, 1, 1)
 		icon.icon:SetDesaturated(true)
 	end
+
+	if LibMasque then
+		-- size only gets set in update so we need to refresh
+		LibMasque:Group("oUF_Hank", "Auras"):ReSkin()
+	end
 end
 
 -- Custom filters
@@ -358,24 +357,21 @@ end
 
 -- Aura mouseover
 oUF_Hank.OnEnterAura = function(self, icon)
-	-- Aura magnification
-	if icon.isDebuff then
-		self.HighlightAura:SetSize(cfg.DebuffSize * cfg.AuraMagnification, cfg.DebuffSize * cfg.AuraMagnification)
-		self.HighlightAura.icon:SetSize(cfg.DebuffSize * cfg.AuraMagnification, cfg.DebuffSize * cfg.AuraMagnification)
-		self.HighlightAura.border:SetSize(cfg.DebuffSize * cfg.AuraMagnification * 1.1, cfg.DebuffSize * cfg.AuraMagnification * 1.1)
-		self.HighlightAura:SetPoint("TOPLEFT", icon, "TOPLEFT", -(cfg.DebuffSize * cfg.AuraMagnification - cfg.DebuffSize) / 2, (cfg.DebuffSize * cfg.AuraMagnification - cfg.DebuffSize) / 2)
-	else
-		self.HighlightAura:SetSize(cfg.BuffSize * cfg.AuraMagnification, cfg.BuffSize * cfg.AuraMagnification)
-		self.HighlightAura.icon:SetSize(cfg.BuffSize * cfg.AuraMagnification, cfg.BuffSize * cfg.AuraMagnification)
-		self.HighlightAura.border:SetSize(cfg.BuffSize * cfg.AuraMagnification * 1.1, cfg.BuffSize * cfg.AuraMagnification * 1.1)
-		self.HighlightAura:SetPoint("TOPLEFT", icon, "TOPLEFT", -(cfg.BuffSize * cfg.AuraMagnification - cfg.BuffSize) / 2, (cfg.BuffSize * cfg.AuraMagnification - cfg.BuffSize) / 2)
-	end
+	local baseSize = (icon.isDebuff and cfg.DebuffSize or cfg.BuffSize)
+	local size = baseSize * cfg.AuraMagnification
+
+	icon.cd:Hide()
+	self.HighlightAura:SetSize(size, size)
+	self.HighlightAura.icon:SetSize(size, size)
+	self.HighlightAura.border:SetSize(size * 1.1, size * 1.1)
+	self.HighlightAura:SetPoint("TOPLEFT", icon, "TOPLEFT", -1 * (size - baseSize) / 2, (size - baseSize) / 2)
 	self.HighlightAura.icon:SetTexture(icon.icon:GetTexture())
 	self.HighlightAura:Show()
 end
 
 -- Aura mouseout
-oUF_Hank.OnLeaveAura = function(self)
+oUF_Hank.OnLeaveAura = function(self, icon)
+	icon.cd:Show()
 	self.HighlightAura:Hide()
 end
 
@@ -389,9 +385,20 @@ oUF_Hank.PostCreateIcon = function(icons, icon)
 		icon.overlay:SetTexCoord(0, 1, 0, 1)
 		icons.showType = true
 	end
+	if LibMasque then
+		local iconInfo = {
+			Icon = icon.icon,
+			Cooldown = icon.cd,
+			Count = icon.count,
+			Border = icon.overlay,
+		}
+		LibMasque:Group("oUF_Hank", "Auras"):AddButton(icon, iconInfo)
+	end
 	icon.cd:SetReverse(true)
-	icon:HookScript("OnEnter", function() oUF_Hank.OnEnterAura(icons:GetParent(), icon) end)
-	icon:HookScript("OnLeave", function() oUF_Hank.OnLeaveAura(icons:GetParent()) end)
+
+	-- Aura magnification
+	icon:HookScript("OnEnter", function(self) oUF_Hank.OnEnterAura(icons:GetParent(), self) end)
+	icon:HookScript("OnLeave", function(self) oUF_Hank.OnLeaveAura(icons:GetParent(), self) end)
 	-- Cancel player buffs on right click
 	icon:HookScript("OnClick", function(_, button, down)
 		if button == "RightButton" and down == false then
@@ -819,7 +826,7 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 	-- Auras
 	if unit == "target" or unit == "focus" then
 		-- Buffs
-		self.Buffs = CreateFrame("Frame", unit .. "_Buffs", self) -- ButtonFace needs a name
+		self.Buffs = CreateFrame("Frame", unit .. "_Buffs", self) -- ButtonFacade needs a name
 		if self.CPoints then
 			self.Buffs:SetPoint("TOPLEFT", self.CPoints[1], "BOTTOMLEFT", 0, -5)
 		else
@@ -834,6 +841,11 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 		self.Buffs.num = cfg["Auras" .. upper(unit)].MaxBuffs
 		self.Buffs.filter = "HELPFUL" -- Explicitly set the filter or the first customFilter call won't work
 
+		self.Buffs.PostUpdateIcon = oUF_Hank.PostUpdateIcon
+		self.Buffs.PostCreateIcon = oUF_Hank.PostCreateIcon
+		self.Buffs.PreSetPosition = oUF_Hank.PreSetPosition
+		self.Buffs.CustomFilter = oUF_Hank.customFilter
+
 		-- Debuffs
 		self.Debuffs = CreateFrame("Frame", unit .. "_Debuffs", self)
 		self.Debuffs:SetPoint("LEFT", self, "LEFT", 0, 0)
@@ -847,6 +859,10 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 		self.Debuffs.num = cfg["Auras" .. upper(unit)].MaxDebuffs
 		self.Debuffs.filter = "HARMFUL"
 
+		self.Debuffs.PostUpdateIcon = oUF_Hank.PostUpdateIcon
+		self.Debuffs.PostCreateIcon = oUF_Hank.PostCreateIcon
+		self.Debuffs.CustomFilter = oUF_Hank.customFilter
+
 		-- Buff magnification effect on mouseover
 		self.HighlightAura = CreateFrame("Frame", nil, self)
 		self.HighlightAura:SetFrameLevel(5) -- Above auras (level 3) and their cooldown overlay (4)
@@ -857,14 +873,6 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 		self.HighlightAura.border = self.HighlightAura:CreateTexture(nil, "OVERLAY")
 		self.HighlightAura.border:SetTexture(cfg.AuraBorder)
 		self.HighlightAura.border:SetPoint("CENTER")
-
-		self.Buffs.PostUpdateIcon = oUF_Hank.PostUpdateIcon
-		self.Debuffs.PostUpdateIcon = oUF_Hank.PostUpdateIcon
-		self.Buffs.PostCreateIcon = oUF_Hank.PostCreateIcon
-		self.Debuffs.PostCreateIcon = oUF_Hank.PostCreateIcon
-		self.Buffs.PreSetPosition = oUF_Hank.PreSetPosition
-		self.Buffs.CustomFilter = oUF_Hank.customFilter
-		self.Debuffs.CustomFilter = oUF_Hank.customFilter
 	end
 
 	-- Runes
