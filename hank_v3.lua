@@ -11,10 +11,10 @@ local ceil, floor = math.ceil, math.floor
 local LibMasque = LibStub("Masque", true)
 
 oUF_Hank.digitTexCoords = {
-	["1"] = {1, 20},
-	["2"] = {21, 31},
-	["3"] = {53, 30},
-	["4"] = {84, 33},
+	["1"] = {  1, 20},
+	["2"] = { 21, 31},
+	["3"] = { 53, 30},
+	["4"] = { 84, 33},
 	["5"] = {118, 30},
 	["6"] = {149, 31},
 	["7"] = {181, 30},
@@ -22,38 +22,39 @@ oUF_Hank.digitTexCoords = {
 	["9"] = {244, 31},
 	["0"] = {276, 31},
 	["%"] = {308, 17},
-	["X"] = {326, 31}, -- Dead
-	["G"] = {358, 36}, -- Ghost
+	["X"] = {326, 31}, 	 -- Dead
+	["G"] = {358, 36}, 	 -- Ghost
 	["Off"] = {395, 23}, -- Offline
-	["B"] = {419, 42}, -- Boss
+	["B"] = {419, 42},   -- Boss
 	["height"] = 42,
 	["texWidth"] = 512,
 	["texHeight"] = 128
 }
 
 oUF_Hank.classResources = {
-	['PALADIN'] = {
+	['PALADIN'] = { -- SPELL_POWER_HOLY_POWER
 		inactive = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\HolyPower.blp', { 0, 18/64, 0, 18/32 }},
-		active = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\HolyPower.blp', { 18/64, 36/64, 0, 18/32 }},
-		size = {18, 18},
+		active   = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\HolyPower.blp', { 18/64, 36/64, 0, 18/32 }},
+		size     = {18, 18},
 	},
-	['MONK'] = {
+	['MONK'] = { -- SPELL_POWER_CHI
 		inactive = {'Interface\\PlayerFrame\\MonkNoPower'},
-		active = {'Interface\\PlayerFrame\\MonkLightPower'},
-		size = {20, 20},
+		active   = {'Interface\\PlayerFrame\\MonkLightPower'},
+		size     = {20, 20},
 	},
-	['PRIEST'] = {
+	['PRIEST'] = { -- SPELL_POWER_SHADOW_ORBS
 		inactive = {'Interface\\PlayerFrame\\Priest-ShadowUI', { 76/256, 112/256, 57/128, 94/128 }},
-		active = {'Interface\\PlayerFrame\\Priest-ShadowUI', { 116/256, 152/256, 57/128, 94/128 }},
-		size = {28, 28},
+		active   = {'Interface\\PlayerFrame\\Priest-ShadowUI', { 116/256, 152/256, 57/128, 94/128 }},
+		size     = {28, 28},
 	},
 	-- totems are handled differently
 	['SHAMAN'] = {
 		inactive = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\blank.blp', { 0, 23/128, 0, 20/32 }},
-		active = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\totems.blp', { (1+23)/128, ((23*2)+1)/128, 0, 20/32 }},
-		size = {23, 20},
+		active   = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\totems.blp', { (1+23)/128, ((23*2)+1)/128, 0, 20/32 }},
+		size     = {23, 20},
 	}
-	-- TODO: druid mushrooms
+	-- ['WARLOCK'] = { SPELL_POWER_BURNING_EMBERS, SPELL_POWER_DEMONIC_FURY }
+	-- ['DRUID'] = {} -- totems: mushrooms
 }
 
 local fntBig = CreateFont("UFFontBig")
@@ -1262,92 +1263,71 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 		self.EclipseBar.counter:SetFontObject("UFFontMedium")
 		self.EclipseBar.counter:SetPoint("RIGHT", self.EclipseBar, "LEFT", -5, 0)
 
-		-- Initialize direction on load
-		self.EclipseBar.direction:SetVertexColor(unpack(cfg.colors.power.ECLIPSE[GetEclipseDirection() == "sun" and "SOLAR" or "LUNAR"]))
+		-- Initialize starting values
+		local eclipse = GetEclipseDirection() == "sun" and "SOLAR" or "LUNAR"
+		self.EclipseBar.direction:SetVertexColor(unpack(cfg.colors.power.ECLIPSE[eclipse]))
+		self.EclipseBar.lastPhase = UnitPower("player", SPELL_POWER_ECLIPSE) < 0 and "sun" or "moon"
 
-		-- Play direction indicator animation on direction change (100% solar or lunar)
-		self.EclipseBar.PostDirectionChange = function()
-			self.EclipseBar.direction.frame = nil
-			self.EclipseBar:SetScript("OnUpdate", function(_ , elapsed)
-				AnimateTexCoords(self.EclipseBar.direction, 256, 64, 22, 22, 11, elapsed, 0.025)
-				if self.EclipseBar.direction.frame > 6 then
-					self.EclipseBar.direction:SetVertexColor(unpack(cfg.colors.power.ECLIPSE[GetEclipseDirection() == "sun" and "SOLAR" or "LUNAR"]))
+		local function AnimateEclipse(element, eclipse)
+			element.frame = nil
+			self.EclipseBar:SetScript("OnUpdate", function(self, elapsed)
+				-- Blizzard global function (UIParent.lua)
+				AnimateTexCoords(element, 256, 64, 22, 22, 11, elapsed, 0.025)
+				if element.frame > 6 then
+					element:SetVertexColor(unpack(cfg.colors.power.ECLIPSE[eclipse]))
 				end
-				if self.EclipseBar.direction.frame == 11 then
-					self.EclipseBar:SetScript("OnUpdate", nil)
-					self.EclipseBar.direction:SetTexCoord(0, 22 / 256, 0, 22 / 64)
+				-- Stop animation on last frame
+				if element.frame == 11 then
+					self:SetScript("OnUpdate", nil)
+					element:SetTexCoord(0, 22 / 256, 0, 22 / 64)
 				end
 			end)
 		end
 
-		-- Initialize phase
-		if UnitPower("player", 8) < 0 then self.EclipseBar.lastPhase = "sun" end
+		-- Play direction indicator animation on direction change (100% solar or lunar)
+		self.EclipseBar.PostDirectionChange = function(self, unit)
+			AnimateEclipse(self.direction, self.directionIsLunar and "LUNAR" or "SOLAR")
+		end
+
+		local wrath = GetSpellInfo(5176)
+		local starfire = GetSpellInfo(2912)
 
 		-- Solar / lunar power updated
-		self.EclipseBar.PostUpdatePower = function()
-			-- Currently in solar phase
-			if self.EclipseBar.SolarBar:GetValue() < self.EclipseBar.LunarBar:GetValue() then
-				-- Solar phase has just been entered => play animation
-				if self.EclipseBar.lastPhase == "moon" then
-					self.EclipseBar.bg.frame = nil
-					self.EclipseBar:SetScript("OnUpdate", function(_ , elapsed)
-						-- Blizzard global function (UIParent.lua)
-						AnimateTexCoords(self.EclipseBar.bg, 256, 64, 22, 22, 11, elapsed, 0.025)
-						if self.EclipseBar.bg.frame > 6 then self.EclipseBar.bg:SetVertexColor(unpack(cfg.colors.power.ECLIPSE.SOLAR)) end
-						-- Stop animation on last frame
-						if self.EclipseBar.bg.frame == 11 then
-							self.EclipseBar:SetScript("OnUpdate", nil)
-							self.EclipseBar.bg:SetTexCoord(0, 22 / 256, 0, 22 / 64)
-						end
-					end)
-				else
-					self.EclipseBar.bg:SetVertexColor(unpack(cfg.colors.power.ECLIPSE.SOLAR))
-				end
+		self.EclipseBar.PostUpdatePower = function(self, unit)
+			local power = UnitPower(unit, SPELL_POWER_ECLIPSE)
+			local currentPhase = power >= 0 and "sun" or "moon"
 
-				-- Fill circle
-				self.EclipseBar.fill:SetTexCoord((10 + floor(self.EclipseBar.SolarBar:GetValue() / 10)) * 22 / 256, (11 + floor(self.EclipseBar.SolarBar:GetValue() / 10)) * 22 / 256, 22 / 64, 44 / 64)
-
-				-- Update cast counter
-				if GetEclipseDirection() == "sun" then
-					-- left lunar eclipse, working towards solar eclipse at double speed
-					self.EclipseBar.counter:SetText(ceil(100/40 + self.EclipseBar.SolarBar:GetValue()/40) .. " Starfires")
-				else
-					self.EclipseBar.counter:SetText(ceil(100/30 - self.EclipseBar.SolarBar:GetValue()/15) .. " Wraths")
-				end
-
-				self.EclipseBar.lastPhase = "sun"
-			-- Currently in lunar phase
+			-- animate/color big circle
+			local eclipse = currentPhase == "sun" and "SOLAR" or "LUNAR"
+			if self.lastPhase ~= currentPhase then
+				AnimateEclipse(self.bg, eclipse)
 			else
-				-- Lunar phase has just been entered => play animation
-				if self.EclipseBar.lastPhase == "sun" then
-					self.EclipseBar.bg.frame = nil
-					self.EclipseBar:SetScript("OnUpdate", function(_ , elapsed)
-						-- Blizzard global function (UIParent.lua)
-						AnimateTexCoords(self.EclipseBar.bg, 256, 64, 22, 22, 11, elapsed, 0.025)
-						if self.EclipseBar.bg.frame > 6 then self.EclipseBar.bg:SetVertexColor(unpack(cfg.colors.power.ECLIPSE.LUNAR)) end
-						-- Stop animation on last frame
-						if self.EclipseBar.bg.frame == 11 then
-							self.EclipseBar:SetScript("OnUpdate", nil)
-							self.EclipseBar.bg:SetTexCoord(0, 22 / 256, 0, 22 / 64)
-						end
-					end)
-				else
-					self.EclipseBar.bg:SetVertexColor(unpack(cfg.colors.power.ECLIPSE.LUNAR))
-				end
-
-				-- Fill circle
-				self.EclipseBar.fill:SetTexCoord((11 + floor(self.EclipseBar.LunarBar:GetValue() / 10)) * 22 / 256, (10 + floor(self.EclipseBar.LunarBar:GetValue() / 10)) * 22 / 256, 22 / 64, 44 / 64)
-
-				-- Update cast counter
-				if GetEclipseDirection() == "sun" then
-					self.EclipseBar.counter:SetText(ceil(100/40 - self.EclipseBar.LunarBar:GetValue()/20) .. " Starfires")
-				else
-					-- left solar eclipse, working towards lunar eclipse at double speed
-					self.EclipseBar.counter:SetText(ceil(100/30 + self.EclipseBar.LunarBar:GetValue()/30) .. " Wraths")
-				end
-
-				self.EclipseBar.lastPhase = "moon"
+				self.bg:SetVertexColor(unpack(cfg.colors.power.ECLIPSE[eclipse]))
 			end
+			-- fill circle
+			self.fill:SetTexCoord((10 + floor(power / 10)) * 22 / 256, (11 + floor(power / 10)) * 22 / 256, 22 / 64, 44 / 64)
+
+			-- cast counter, but flags are only set in UnitAura which usually fires after UnitPower
+			if self.hasLunarEclipse or power == -100 then
+				self.counter:SetFormattedText("%d %s", ceil(100/40 - power/20), starfire)
+			elseif self.hasSolarEclipse or power == 100 then
+				local numCasts = ceil(power/15) -- until out of eclipse
+				      numCasts = numCasts + ceil((100+power - numCasts*15)/30)
+				self.counter:SetFormattedText("%d %s", numCasts, wrath)
+			else
+				if currentPhase == "sun" then
+					self.counter:SetFormattedText("%d %s", ceil((100 - power)/20/2), starfire)
+				else
+					self.counter:SetFormattedText("%d %s", ceil((100 + power)/15/2), wrath)
+				end
+			end
+
+			self.lastPhase = currentPhase
+		end
+		-- make sure we initialize properly
+		self.EclipseBar.PostUnitAura = function(self, unit)
+			self.PostUpdatePower(self, unit)
+			self.PostUnitAura = nil
 		end
 	end
 
