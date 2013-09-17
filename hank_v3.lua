@@ -56,7 +56,7 @@ oUF_Hank.classTotems = {
 		active   = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\totems.blp', { (1+23)/128, ((23*2)+1)/128, 0, 20/32 }},
 		size     = {23, 20},
 	},
-	['DRUID'] = { -- mushrooms
+	['DRUID'] = { -- mushrooms, needs their own texture at some point
 		inactive = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\blank.blp', { 0, 23/128, 0, 20/32 }},
 		active   = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\totems.blp', { (1+23)/128, ((23*2)+1)/128, 0, 20/32 }},
 		size     = {23, 20},
@@ -1081,11 +1081,17 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 
 		self.Totems = {}
 		for index = 1, MAX_TOTEMS do
-			local totem = CreateFrame('Button', nil, self)
+			local totem = CreateFrame('Button', nil, self, 'SecureActionButtonTemplate', index)
 			totem:SetSize(data and data.size[1] or 40, data and data.size[2] or 40)
 			totem:SetNormalTexture(data['active'][1])
 			if data['inactive'][2] then
 				totem:GetNormalTexture():SetTexCoord(unpack(data['inactive'][2]))
+			end
+
+			if cfg.ClickToDestroy then
+				totem:RegisterForClicks('RightButtonUp')
+				totem:SetAttribute('type', 'macro')
+				totem:SetAttribute('macrotext', '/click TotemFrameTotem'..index..' RightButton')
 			end
 
 			local fill = totem:CreateTexture(nil, "OVERLAY")
@@ -1560,8 +1566,6 @@ if cfg.Castbar then oUF_Hank.AdjustMirrorBars() end
 
 if cfg.RangeFade and not IsAddOnLoaded("oUF_SpellRange") then
 	DEFAULT_CHAT_FRAME:AddMessage("oUF_Hank: Please download and install oUF_SpellRange before enabling range checks!", cfg.colors.text[1], cfg.colors.text[2], cfg.colors.text[3])
-elseif cfg.TotemBar and not IsAddOnLoaded("oUF_TotemBar") then
-	DEFAULT_CHAT_FRAME:AddMessage("oUF_Hank: Please download and install oUF_TotemBar before enabling the totem bar!", cfg.colors.text[1], cfg.colors.text[2], cfg.colors.text[3])
 end
 
 -- Call for custom_modifications
