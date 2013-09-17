@@ -1289,7 +1289,7 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 		-- Solar / lunar power updated
 		self.EclipseBar.PostUpdatePower = function(self, unit)
 			local power = UnitPower(unit, SPELL_POWER_ECLIPSE)
-			local currentPhase = power >= 0 and "sun" or "moon"
+			local currentPhase = power == 0 and GetEclipseDirection() or power > 0 and "sun" or "moon"
 
 			-- animate/color big circle
 			local eclipse = currentPhase == "sun" and "SOLAR" or "LUNAR"
