@@ -56,11 +56,7 @@ oUF_Hank.classTotems = {
 		active   = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\totems.blp', { (1+23)/128, ((23*2)+1)/128, 0, 20/32 }},
 		size     = {23, 20},
 	},
-	['DRUID'] = { -- mushrooms, needs their own texture at some point
-		inactive = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\blank.blp', { 0, 23/128, 0, 20/32 }},
-		active   = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\totems.blp', { (1+23)/128, ((23*2)+1)/128, 0, 20/32 }},
-		size     = {23, 20},
-	},
+	-- TODO: DRUID mushrooms, DEATHKNIGHT ghoul, ...
 }
 
 local fntBig = CreateFont("UFFontBig")
@@ -884,41 +880,9 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 
 	-- Runes
 	if unit == "player" and playerClass == "DEATHKNIGHT" then
-		local runemap = { 1, 2, 5, 6, 3, 4 }
-		self.Runes = CreateFrame("Frame", nil, self)
-		self.Runes:SetPoint("TOPRIGHT", self, "BOTTOMRIGHT")
-		self.Runes:SetSize(96, 16)
-		self.Runes.anchor = "TOPLEFT"
-		self.Runes.growth = "RIGHT"
-		self.Runes.height = 16
-		self.Runes.width = 16
-
-		for i = 1, 6 do
-			self.Runes[i] = CreateFrame("StatusBar", nil, self.Runes)
-			self.Runes[i]:SetStatusBarTexture("Interface\\AddOns\\oUF_Hank_v3\\textures\\blank.blp")
-			self.Runes[i]:SetSize(16, 16)
-
-			if i == 1 then
-				self.Runes[i]:SetPoint("TOPLEFT", self.Runes, "TOPLEFT")
-			else
-				self.Runes[i]:SetPoint("LEFT", self.Runes[i - 1], "RIGHT")
-			end
-
-			local backdrop = self.Runes[i]:CreateTexture(nil, "ARTWORK")
-			backdrop:SetSize(16, 16)
-			backdrop:SetAllPoints()
-			backdrop:SetTexture("Interface\\AddOns\\oUF_Hank_v3\\textures\\combo.blp")
-			backdrop:SetTexCoord(0, 16 / 64, 0, 1)
-
-			-- This is actually the fill layer, but "bg" gets automatically vertex-colored by the runebar module. So let's make use of that!
-			self.Runes[i].bg = self.Runes[i]:CreateTexture(nil, "OVERLAY")
-			self.Runes[i].bg:SetSize(16, 16)
-			self.Runes[i].bg:SetPoint("BOTTOM")
-			self.Runes[i].bg:SetTexture("Interface\\AddOns\\oUF_Hank_v3\\textures\\combo.blp")
-			self.Runes[i].bg:SetTexCoord(0.5, 0.75, 0, 1)
-
+		local function initRunesAnimations(frame, index, rune)
 			-- Shine effect
-			local shinywheee = CreateFrame("Frame", nil, self.Runes[i])
+			local shinywheee = CreateFrame("Frame", nil, rune)
 			shinywheee:SetAllPoints()
 			shinywheee:SetAlpha(0)
 			shinywheee:Hide()
@@ -959,6 +923,42 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 
 			anim:SetScript("OnFinished", function() shinywheee:Hide() end)
 			shinywheee:SetScript("OnShow", function() anim:Play() end)
+		end
+
+		local runemap = { 1, 2, 5, 6, 3, 4 }
+		self.Runes = CreateFrame("Frame", nil, self)
+		self.Runes:SetPoint("TOPRIGHT", self, "BOTTOMRIGHT")
+		self.Runes:SetSize(96, 16)
+		self.Runes.anchor = "TOPLEFT"
+		self.Runes.growth = "RIGHT"
+		self.Runes.height = 16
+		self.Runes.width = 16
+
+		for i = 1, 6 do
+			self.Runes[i] = CreateFrame("StatusBar", nil, self.Runes)
+			self.Runes[i]:SetStatusBarTexture("Interface\\AddOns\\oUF_Hank_v3\\textures\\blank.blp")
+			self.Runes[i]:SetSize(16, 16)
+
+			if i == 1 then
+				self.Runes[i]:SetPoint("TOPLEFT", self.Runes, "TOPLEFT")
+			else
+				self.Runes[i]:SetPoint("LEFT", self.Runes[i - 1], "RIGHT")
+			end
+
+			local backdrop = self.Runes[i]:CreateTexture(nil, "ARTWORK")
+			backdrop:SetSize(16, 16)
+			backdrop:SetAllPoints()
+			backdrop:SetTexture("Interface\\AddOns\\oUF_Hank_v3\\textures\\combo.blp")
+			backdrop:SetTexCoord(0, 16 / 64, 0, 1)
+
+			-- This is actually the fill layer, but "bg" gets automatically vertex-colored by the runebar module. So let's make use of that!
+			self.Runes[i].bg = self.Runes[i]:CreateTexture(nil, "OVERLAY")
+			self.Runes[i].bg:SetSize(16, 16)
+			self.Runes[i].bg:SetPoint("BOTTOM")
+			self.Runes[i].bg:SetTexture("Interface\\AddOns\\oUF_Hank_v3\\textures\\combo.blp")
+			self.Runes[i].bg:SetTexCoord(0.5, 0.75, 0, 1)
+
+			initRunesAnimations(self, i, self.Runes[i])
 
 			self.Runes[i]:SetScript("OnValueChanged", function(self, val)
 				local start, duration, runeReady = GetRuneCooldown(runemap[i])
@@ -984,245 +984,6 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 				rune.bg:SetSize(16, 4 + 8 * val / 10)
 				-- Show at least the empty 4 bottom pixels + val% of the 8 pixels of the actual dot = 12px max
 				rune.bg:SetTexCoord(0.25, 0.5, 12 / 16 - 8 * val / 10 / 16, 1)
-			end
-		end
-	end
-
-	local initClassIconAnimation, updateClassIconAnimation
-	local initClassIcons, initClassSingleIcon
-	-- animation: fade in
-	if unit == "player" and (playerClass == "MONK" or playerClass == "PALADIN") then
-		initClassIconAnimation = function(unitFrame, i)
-			unitFrame.ClassIcons.animations[i] = unitFrame.ClassIcons[i]:CreateAnimationGroup()
-			local alphaIn = unitFrame.ClassIcons.animations[i]:CreateAnimation("Alpha")
-			alphaIn:SetChange(1)
-			alphaIn:SetSmoothing("OUT")
-			alphaIn:SetDuration(1)
-			alphaIn:SetOrder(1)
-
-			unitFrame.ClassIcons.animations[i]:SetScript("OnFinished", function() unitFrame.ClassIcons[i]:SetAlpha(1) end)
-		end
-		updateClassIconAnimation = function(unitFrame, current, max)
-			unitFrame.ClassIcons.animLastState = unitFrame.ClassIcons.animLastState or 0
-			if current > 0 then
-				if unitFrame.ClassIcons.animLastState < current then
-					-- Play animation only when we gain power
-					unitFrame.ClassIcons[current]:SetAlpha(0)
-					unitFrame.ClassIcons.animations[current]:Play();
-				end
-			else
-				for i = 1, max do
-					-- no holy power, stop all running animations
-					unitFrame.ClassIcons.animLastState = current
-					if unitFrame.ClassIcons.animations[i]:IsPlaying() then
-						unitFrame.ClassIcons.animations[i]:Stop()
-					end
-				end
-			end
-			unitFrame.ClassIcons.animLastState = current
-		end
-	end
-
-	-- Soul Shards / Burning Embers / Demonic Fury (reuse Blizzard's)
-	if unit == "player" and playerClass == "WARLOCK" then
-		local extra = _G["WarlockPowerFrame"]
-		extra:SetScale(0.6)
-		extra:SetParent(self)
-		extra:ClearAllPoints()
-		extra:SetPoint("TOPRIGHT", self, "BOTTOMRIGHT", -16, 2)
-	end
-
-	-- Holy power
-	if unit == "player" and playerClass == "PALADIN" then
-		initClassIcons = function(unitFrame)
-			unitFrame.ClassIcons.animLastState = UnitPower("player", SPELL_POWER_HOLY_POWER)
-		end
-		initClassSingleIcon = function(unitFrame, i)
-			unitFrame.ClassIcons[i]:SetVertexColor(unpack(cfg.colors.power.HOLY_POWER))
-		end
-	end
-
-	-- Totems
-	if unit == "player" and cfg.TotemBar then
-		local data = oUF_Hank.classTotems[playerClass] or oUF_Hank.classTotems['SHAMAN']
-
-		local initTotemAnimations = function(unitFrame, i, icon)
-			local glowywheee = CreateFrame("Frame", nil, icon)
-			glowywheee:SetAllPoints()
-			glowywheee:SetAlpha(0)
-			glowywheee:Hide()
-			icon.glowywheee = glowywheee
-
-			local glow = glowywheee:CreateTexture(nil, "OVERLAY")
-			glow:SetAllPoints()
-			glow:SetPoint("CENTER")
-			glow:SetTexture(data['active'][1])
-			glow:SetTexCoord((2 + 2 * 23) / 128, ((23 * 3) + 2) / 128, 0, 20 / 32)
-			icon.glow = glow
-
-			local glowend = icon:CreateTexture(nil, "OVERLAY")
-			glowend:SetAllPoints()
-			glowend:SetTexture(data['active'][1])
-			glowend:SetTexCoord((2 + 2 * 23) / 128, ((23 * 3) + 2) / 128, 0, 20 / 32)
-			glowend:SetAlpha(0.5)
-			glowend:Hide()
-			icon.glowend = glowend
-
-			local anim = glowywheee:CreateAnimationGroup()
-			local alphaIn = anim:CreateAnimation("Alpha")
-			alphaIn:SetChange(0.5)
-			alphaIn:SetSmoothing("OUT")
-			alphaIn:SetDuration(1.5)
-			alphaIn:SetOrder(1)
-
-			glowywheee:SetScript("OnShow", function() glowend:Hide(); anim:Play() end)
-			anim:SetScript("OnFinished", function() glowend:Show(); glowend:SetAlpha(0.5) end)
-		end
-
-		self.Totems = {}
-		for index = 1, MAX_TOTEMS do
-			local totem = CreateFrame('Button', nil, self, 'SecureActionButtonTemplate', index)
-			totem:SetSize(data and data.size[1] or 40, data and data.size[2] or 40)
-			totem:SetNormalTexture(data['active'][1])
-			if data['inactive'][2] then
-				totem:GetNormalTexture():SetTexCoord(unpack(data['inactive'][2]))
-			end
-
-			if cfg.ClickToDestroy then
-				totem:RegisterForClicks('RightButtonUp')
-				totem:SetAttribute('type', 'macro')
-				totem:SetAttribute('macrotext', '/click TotemFrameTotem'..index..' RightButton')
-			end
-
-			local fill = totem:CreateTexture(nil, "OVERLAY")
-			fill:SetSize(data and data.size[1] or 40, data and data.size[2] or 40)
-			fill:SetTexture(data['active'][1])
-			if data['active'][2] then
-				fill:SetTexCoord(unpack(data['active'][2]))
-			end
-			fill:SetPoint('BOTTOM')
-			totem.fill = fill
-
-			if playerClass == "SHAMAN" then
-				fill:SetVertexColor(unpack(cfg.colors.totems[index]))
-
-				if index == 1 then
-					totem:SetPoint("TOPLEFT",  self, "BOTTOMRIGHT", -1 * data.size[1] * MAX_TOTEMS, 0)
-				else
-					totem:SetPoint("LEFT", self.Totems[index - 1], "RIGHT", data.spacing or 0, 0)
-				end
-			else
-				if playerClass == "DRUID" then
-					fill:SetVertexColor(unpack(cfg.colors.power.ECLIPSE.SOLAR))
-				elseif playerClass == "DEATHKNIGHT" then
-					fill:SetVertexColor(unpack(cfg.colors.power.runes[4]))
-				end
-				totem:SetPoint("TOPRIGHT", self, "BOTTOMRIGHT", -1 * data.size[1] * (index - 1), -24)
-			end
-
-			initTotemAnimations(self, index, totem)
-
-			self.Totems[index] = totem
-		end
-
-		self.Totems.PostUpdate = function(self, index, haveTotem, name, start, duration, icon)
-			local width, height = data and data.size[1] or 40, data and data.size[2] or 40
-			local total, val = 0, 0
-			if haveTotem then
-				if duration > 0 then
-					self[index].fill:Show()
-					self[index]:SetScript("OnUpdate", function(self, elapsed)
-						total = total + elapsed
-						if total >= 0.3 then
-							-- _, _, start, duration = GetTotemInfo(self:GetID())
-							val = 1 - (GetTime() - start) / duration
-							total = 0
-							if GetTime() - start <= 0 then
-								self.fill:SetHeight(0)
-								self:SetScript("OnUpdate", nil)
-							else
-								self.fill:SetHeight((4 + 12 * val) * height / 20)
-								self.fill:SetTexCoord((1 + 23) / 128, ((23 * 2) + 1) / 128, 16 / 32 - 12 * val / 32, 20 / 32)
-							end
-						end
-					end)
-				end
-			else
-				self[index]:SetScript("OnUpdate", nil)
-				self[index].glow:SetVertexColor(self[index].fill:GetVertexColor())
-				self[index].glowend:SetVertexColor(self[index].fill:GetVertexColor())
-				self[index].fill:Hide()
-				self[index].glowywheee:Show()
-			end
-
-			if playerClass == "SHAMAN" then
-				-- alwys show even if empty
-				self[index]:Show()
-			end
-		end
-	end
-
-	-- ClassIcons: Harmony Orbs / Shadow Orbs / Holy Power
-	if unit == "player" and (playerClass == "MONK" or playerClass == "PRIEST" or playerClass == "PALADIN") then
-		local data = oUF_Hank.classResources[playerClass]
-		local bg = {}
-		self.ClassIcons = {}
-		self.ClassIcons.animations = {}
-
-		if initClassIcons then
-			initClassIcons(self)
-		end
-
-		for i = 1, 5 do
-			bg[i] = CreateFrame("Frame", nil, self)
-			bg[i]:SetSize(data.size[1] or 28, data.size[2] or 28)
-
-			bg[i].tex = bg[i]:CreateTexture(nil, "ARTWORK")
-			bg[i].tex:SetTexture(data['inactive'][1])
-			if data['inactive'][2] then
-				bg[i].tex:SetTexCoord(unpack(data['inactive'][2]))
-			else
-				bg[i].tex:SetTexCoord(0, 1, 0, 1)
-			end
-			bg[i].tex:SetAllPoints(bg[i])
-
-			if i == 1 then
-				bg[i]:SetPoint("TOPLEFT", self, "BOTTOMRIGHT", -1*(data.size[1] or 28)*5, 0)
-			else
-				bg[i]:SetPoint("LEFT", bg[i - 1], "RIGHT", 0, 0)
-			end
-
-			self.ClassIcons[i] = bg[i]:CreateTexture(nil, "OVERLAY")
-			self.ClassIcons[i]:SetTexture(data['active'][1])
-			if data['active'][2] then
-				self.ClassIcons[i]:SetTexCoord(unpack(data['active'][2]))
-			else
-				self.ClassIcons[i]:SetTexCoord(0, 1, 0, 1)
-			end
-			self.ClassIcons[i]:SetAllPoints(bg[i])
-
-			-- need access to the background in the PostUpdate function
-			self.ClassIcons[i].bg = bg[i].tex
-
-			if initClassSingleIcon then
-				initClassSingleIcon(self, i)
-			end
-			if initClassIconAnimation then
-				initClassIconAnimation(self, i)
-			end
-		end
-
-		self.ClassIcons.PostUpdate = function(_, current, max)
-			for i = 1, 5 do
-				if i > max then
-					self.ClassIcons[i]:Hide()
-					self.ClassIcons[i].bg:Hide()
-				else
-					self.ClassIcons[i].bg:Show()
-				end
-			end
-			if updateClassIconAnimation then
-				updateClassIconAnimation(self, current, max)
 			end
 		end
 	end
@@ -1322,6 +1083,241 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 		self.EclipseBar.PostUnitAura = function(self, unit)
 			self.PostUpdatePower(self, unit)
 			self.PostUnitAura = nil
+		end
+	end
+
+	-- Totems
+	if unit == "player" and cfg.TotemBar then
+		local data = oUF_Hank.classTotems[playerClass] or oUF_Hank.classTotems['SHAMAN']
+
+		local initTotemAnimations = function(frame, index, totem)
+			local r, g, b, a = totem.fill:GetVertexColor()
+
+			local glowywheee = CreateFrame("Frame", nil, totem)
+			glowywheee:SetAllPoints()
+			glowywheee:SetAlpha(0)
+			glowywheee:Hide()
+			totem.glowywheee = glowywheee
+
+			local glow = glowywheee:CreateTexture(nil, "OVERLAY")
+			glow:SetAllPoints()
+			glow:SetPoint("CENTER")
+			glow:SetTexture(data['active'][1])
+			glow:SetTexCoord((2 + 2 * 23) / 128, ((23 * 3) + 2) / 128, 0, 20 / 32)
+			glow:SetVertexColor(r, g, b, a)
+			totem.glow = glow
+
+			local glowend = totem:CreateTexture(nil, "OVERLAY")
+			glowend:SetAllPoints()
+			glowend:SetTexture(data['active'][1])
+			glowend:SetTexCoord((2 + 2 * 23) / 128, ((23 * 3) + 2) / 128, 0, 20 / 32)
+			glowend:SetVertexColor(r, g, b, a)
+			glowend:SetAlpha(0.5)
+			glowend:Hide()
+			totem.glowend = glowend
+
+			local anim = glowywheee:CreateAnimationGroup()
+			local alphaIn = anim:CreateAnimation("Alpha")
+			alphaIn:SetChange(0.5)
+			alphaIn:SetSmoothing("OUT")
+			alphaIn:SetDuration(1.5)
+			alphaIn:SetOrder(1)
+
+			glowywheee:SetScript("OnShow", function() glowend:Hide(); anim:Play() end)
+			anim:SetScript("OnFinished", function() glowend:Show(); glowend:SetAlpha(0.5) end)
+		end
+
+		self.Totems = {}
+		for index = 1, MAX_TOTEMS do
+			local totem = CreateFrame('Button', nil, self, nil, index)
+			totem:SetSize(data.size[1], data.size[2])
+			totem:SetNormalTexture(data['active'][1])
+			if data['inactive'][2] then
+				totem:GetNormalTexture():SetTexCoord(unpack(data['inactive'][2]))
+			end
+
+			local fill = totem:CreateTexture(nil, "OVERLAY")
+			fill:SetSize(data.size[1], data.size[2])
+			fill:SetTexture(data['active'][1])
+			if data['active'][2] then
+				fill:SetTexCoord(unpack(data['active'][2]))
+			end
+
+			fill:SetPoint('BOTTOM')
+			totem.fill = fill
+
+			if playerClass == "SHAMAN" then
+				fill:SetVertexColor(unpack(cfg.colors.totems[index]))
+
+				if index == 1 then
+					totem:SetPoint("TOPLEFT",  self, "BOTTOMRIGHT", -1 * data.size[1] * MAX_TOTEMS, 0)
+				else
+					totem:SetPoint("LEFT", self.Totems[index - 1], "RIGHT", data.spacing or 0, 0)
+				end
+			else
+				if playerClass == "DRUID" then
+					fill:SetVertexColor(unpack(cfg.colors.power.ECLIPSE.SOLAR))
+				elseif playerClass == "DEATHKNIGHT" then
+					fill:SetVertexColor(unpack(cfg.colors.power.runes[4]))
+				end
+				totem:SetPoint("TOPRIGHT", self, "BOTTOMRIGHT", -1 * data.size[1] * (index - 1), -24)
+			end
+
+			initTotemAnimations(self, index, totem)
+
+			self.Totems[index] = totem
+		end
+
+		self.Totems.PostUpdate = function(self, index, haveTotem, name, start, duration, icon)
+			self[index].fill:SetHeight(0.000000001)
+			if playerClass == "SHAMAN" then
+				-- alwys show even if empty
+				self[index]:Show()
+			end
+
+			local total, val = 0, 0
+			-- imitate statusbar behavior on .fill
+			if haveTotem then
+				if duration > 0 then
+					self[index]:SetScript("OnUpdate", function(self, elapsed)
+						total = total + elapsed
+						if total >= 0.3 then
+							total = 0
+							if GetTime() - start <= 0 then
+								self:SetScript("OnUpdate", nil)
+							else
+								local val = 1 - (GetTime() - start) / duration
+								local newHeight = (4 + 12 * val) * data.size[2] / 20
+								self.fill:SetHeight(newHeight)
+								self.fill:SetTexCoord((1 + 23) / 128, ((23 * 2) + 1) / 128, 16 / 32 - 12 * val / 32, 20 / 32)
+
+								self.glowend:Hide()
+								self.glowywheee:Hide()
+							end
+						end
+					end)
+				end
+			else
+				self[index]:SetScript("OnUpdate", nil)
+				self[index].glowywheee:Show()
+			end
+		end
+	end
+
+	local initClassIconAnimation, updateClassIconAnimation
+	local initClassIcons, initClassSingleIcon
+	-- animation: fade in
+	if unit == "player" and (playerClass == "MONK" or playerClass == "PALADIN") then
+		initClassIconAnimation = function(unitFrame, i)
+			unitFrame.ClassIcons.animations[i] = unitFrame.ClassIcons[i]:CreateAnimationGroup()
+			local alphaIn = unitFrame.ClassIcons.animations[i]:CreateAnimation("Alpha")
+			alphaIn:SetChange(1)
+			alphaIn:SetSmoothing("OUT")
+			alphaIn:SetDuration(1)
+			alphaIn:SetOrder(1)
+
+			unitFrame.ClassIcons.animations[i]:SetScript("OnFinished", function() unitFrame.ClassIcons[i]:SetAlpha(1) end)
+		end
+		updateClassIconAnimation = function(unitFrame, current, max)
+			unitFrame.ClassIcons.animLastState = unitFrame.ClassIcons.animLastState or 0
+			if current > 0 then
+				if unitFrame.ClassIcons.animLastState < current then
+					-- Play animation only when we gain power
+					unitFrame.ClassIcons[current]:SetAlpha(0)
+					unitFrame.ClassIcons.animations[current]:Play();
+				end
+			else
+				for i = 1, max do
+					-- no holy power, stop all running animations
+					unitFrame.ClassIcons.animLastState = current
+					if unitFrame.ClassIcons.animations[i]:IsPlaying() then
+						unitFrame.ClassIcons.animations[i]:Stop()
+					end
+				end
+			end
+			unitFrame.ClassIcons.animLastState = current
+		end
+	end
+
+	if unit ~= "player" then
+		-- nothing
+	elseif playerClass == "PALADIN" then
+		-- Holy power
+		initClassIcons = function(unitFrame)
+			unitFrame.ClassIcons.animLastState = UnitPower("player", SPELL_POWER_HOLY_POWER)
+		end
+		initClassSingleIcon = function(unitFrame, i)
+			unitFrame.ClassIcons[i]:SetVertexColor(unpack(cfg.colors.power.HOLY_POWER))
+		end
+	elseif playerClass == "WARLOCK" then
+		-- Soul Shards / Burning Embers / Demonic Fury (reuse Blizzard's)
+		local extra = _G["WarlockPowerFrame"]
+		extra:SetScale(0.6)
+		extra:SetParent(self)
+		extra:ClearAllPoints()
+		extra:SetPoint("TOPRIGHT", self, "BOTTOMRIGHT", -16, 2)
+	elseif playerClass == "MONK" or playerClass == "PRIEST" or playerClass == "PALADIN" then
+		-- ClassIcons: Harmony Orbs / Shadow Orbs / Holy Power
+		local data = oUF_Hank.classResources[playerClass]
+		local bg = {}
+		self.ClassIcons = {}
+		self.ClassIcons.animations = {}
+
+		if initClassIcons then
+			initClassIcons(self)
+		end
+
+		for i = 1, 5 do
+			bg[i] = CreateFrame("Frame", nil, self)
+			bg[i]:SetSize(data.size[1] or 28, data.size[2] or 28)
+
+			bg[i].tex = bg[i]:CreateTexture(nil, "ARTWORK")
+			bg[i].tex:SetTexture(data['inactive'][1])
+			if data['inactive'][2] then
+				bg[i].tex:SetTexCoord(unpack(data['inactive'][2]))
+			else
+				bg[i].tex:SetTexCoord(0, 1, 0, 1)
+			end
+			bg[i].tex:SetAllPoints(bg[i])
+
+			if i == 1 then
+				bg[i]:SetPoint("TOPLEFT", self, "BOTTOMRIGHT", -1*(data.size[1] or 28)*5, 0)
+			else
+				bg[i]:SetPoint("LEFT", bg[i - 1], "RIGHT", 0, 0)
+			end
+
+			self.ClassIcons[i] = bg[i]:CreateTexture(nil, "OVERLAY")
+			self.ClassIcons[i]:SetTexture(data['active'][1])
+			if data['active'][2] then
+				self.ClassIcons[i]:SetTexCoord(unpack(data['active'][2]))
+			else
+				self.ClassIcons[i]:SetTexCoord(0, 1, 0, 1)
+			end
+			self.ClassIcons[i]:SetAllPoints(bg[i])
+
+			-- need access to the background in the PostUpdate function
+			self.ClassIcons[i].bg = bg[i].tex
+
+			if initClassSingleIcon then
+				initClassSingleIcon(self, i)
+			end
+			if initClassIconAnimation then
+				initClassIconAnimation(self, i)
+			end
+		end
+
+		self.ClassIcons.PostUpdate = function(_, current, max)
+			for i = 1, 5 do
+				if i > max then
+					self.ClassIcons[i]:Hide()
+					self.ClassIcons[i].bg:Hide()
+				else
+					self.ClassIcons[i].bg:Show()
+				end
+			end
+			if updateClassIconAnimation then
+				updateClassIconAnimation(self, current, max)
+			end
 		end
 	end
 
