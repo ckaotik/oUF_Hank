@@ -32,17 +32,20 @@ oUF_Hank.digitTexCoords = {
 }
 
 oUF_Hank.classResources = {
-	['PALADIN'] = { -- SPELL_POWER_HOLY_POWER
+	['PALADIN'] = {
+		resource = SPELL_POWER_HOLY_POWER,
 		inactive = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\HolyPower.blp', { 0, 18/64, 0, 18/32 }},
 		active   = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\HolyPower.blp', { 18/64, 36/64, 0, 18/32 }},
 		size     = {18, 18},
 	},
-	['MONK'] = { -- SPELL_POWER_CHI
+	['MONK'] = {
+		resource = SPELL_POWER_CHI,
 		inactive = {'Interface\\PlayerFrame\\MonkNoPower'},
 		active   = {'Interface\\PlayerFrame\\MonkLightPower'},
 		size     = {20, 20},
 	},
-	['PRIEST'] = { -- SPELL_POWER_SHADOW_ORBS
+	['PRIEST'] = {
+		resource = SPELL_POWER_SHADOW_ORBS,
 		inactive = {'Interface\\PlayerFrame\\Priest-ShadowUI', { 76/256, 112/256, 57/128, 94/128 }},
 		active   = {'Interface\\PlayerFrame\\Priest-ShadowUI', { 116/256, 152/256, 57/128, 94/128 }},
 		size     = {28, 28},
@@ -56,7 +59,7 @@ oUF_Hank.classTotems = {
 		active   = {'Interface\\AddOns\\oUF_Hank_v3\\textures\\totems.blp', { (1+23)/128, ((23*2)+1)/128, 0, 20/32 }},
 		size     = {23, 20},
 	},
-	-- TODO: DRUID mushrooms, DEATHKNIGHT ghoul, ...
+	-- TODO: DRUID mushrooms, DEATHKNIGHT ghoul, PALADIN hammer, ...
 }
 
 local fntBig = CreateFont("UFFontBig")
@@ -1160,6 +1163,8 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 					fill:SetVertexColor(unpack(cfg.colors.power.ECLIPSE.SOLAR))
 				elseif playerClass == "DEATHKNIGHT" then
 					fill:SetVertexColor(unpack(cfg.colors.runes[4]))
+				elseif playerClass == "PALADIN" then
+					fill:SetVertexColor(unpack(cfg.colors.power.HOLY_POWER))
 				end
 				totem:SetPoint("TOPRIGHT", self, "BOTTOMRIGHT", -1 * data.size[1] * (index - 1), -24)
 			end
@@ -1205,51 +1210,8 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 		end
 	end
 
-	local initClassIconAnimation, updateClassIconAnimation
-	local initClassIcons, initClassSingleIcon
-	-- animation: fade in
-	if unit == "player" and (playerClass == "MONK" or playerClass == "PALADIN") then
-		initClassIconAnimation = function(unitFrame, i)
-			unitFrame.ClassIcons.animations[i] = unitFrame.ClassIcons[i]:CreateAnimationGroup()
-			local alphaIn = unitFrame.ClassIcons.animations[i]:CreateAnimation("Alpha")
-			alphaIn:SetChange(1)
-			alphaIn:SetSmoothing("OUT")
-			alphaIn:SetDuration(1)
-			alphaIn:SetOrder(1)
-
-			unitFrame.ClassIcons.animations[i]:SetScript("OnFinished", function() unitFrame.ClassIcons[i]:SetAlpha(1) end)
-		end
-		updateClassIconAnimation = function(unitFrame, current, max)
-			unitFrame.ClassIcons.animLastState = unitFrame.ClassIcons.animLastState or 0
-			if current > 0 then
-				if unitFrame.ClassIcons.animLastState < current then
-					-- Play animation only when we gain power
-					unitFrame.ClassIcons[current]:SetAlpha(0)
-					unitFrame.ClassIcons.animations[current]:Play();
-				end
-			else
-				for i = 1, max do
-					-- no holy power, stop all running animations
-					unitFrame.ClassIcons.animLastState = current
-					if unitFrame.ClassIcons.animations[i]:IsPlaying() then
-						unitFrame.ClassIcons.animations[i]:Stop()
-					end
-				end
-			end
-			unitFrame.ClassIcons.animLastState = current
-		end
-	end
-
 	if unit ~= "player" then
 		-- nothing
-	elseif playerClass == "PALADIN" then
-		-- Holy power
-		initClassIcons = function(unitFrame)
-			unitFrame.ClassIcons.animLastState = UnitPower("player", SPELL_POWER_HOLY_POWER)
-		end
-		initClassSingleIcon = function(unitFrame, i)
-			unitFrame.ClassIcons[i]:SetVertexColor(unpack(cfg.colors.power.HOLY_POWER))
-		end
 	elseif playerClass == "WARLOCK" then
 		-- Soul Shards / Burning Embers / Demonic Fury (reuse Blizzard's)
 		local extra = _G["WarlockPowerFrame"]
@@ -1260,60 +1222,76 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 	elseif playerClass == "MONK" or playerClass == "PRIEST" or playerClass == "PALADIN" then
 		-- ClassIcons: Harmony Orbs / Shadow Orbs / Holy Power
 		local data = oUF_Hank.classResources[playerClass]
-		local bg = {}
 		self.ClassIcons = {}
 		self.ClassIcons.animations = {}
+		self.ClassIcons.animLastState = UnitPower("player", data.resource)
 
-		if initClassIcons then
-			initClassIcons(self)
+		local function initClassIconAnimation(self, i)
+			self.animations[i] = self[i]:CreateAnimationGroup()
+			local alphaIn = self.animations[i]:CreateAnimation("Alpha")
+			alphaIn:SetChange(1)
+			alphaIn:SetSmoothing("OUT")
+			alphaIn:SetDuration(1)
+			alphaIn:SetOrder(1)
+
+			self.animations[i]:SetScript("OnFinished", function() self[i]:SetAlpha(1) end)
+		end
+		local function updateClassIconAnimation(self, current, max)
+			self.animLastState = self.animLastState or 0
+			if current > 0 then
+				if self.animLastState < current then
+					-- Play animation only when we gain power
+					self[current]:SetAlpha(0)
+					self.animations[current]:Play();
+				end
+			else
+				for i = 1, max do
+					-- no holy power, stop all running animations
+					self.animLastState = current
+					if self.animations[i]:IsPlaying() then
+						self.animations[i]:Stop()
+					end
+				end
+			end
+			self.animLastState = current
 		end
 
-		for i = 1, 5 do
-			bg[i] = CreateFrame("Frame", nil, self)
-			bg[i]:SetSize(data.size[1] or 28, data.size[2] or 28)
+		for index = 1, 5 do
+			local texture = self:CreateTexture(nil, "OVERLAY")
+			texture:SetSize(data.size[1] or 28, data.size[2] or 28)
+			texture:SetTexture(data.active[1])
+			if data.active[2] then
+				texture:SetTexCoord(unpack(data.active[2]))
+			end
 
-			bg[i].tex = bg[i]:CreateTexture(nil, "ARTWORK")
-			bg[i].tex:SetTexture(data['inactive'][1])
-			if data['inactive'][2] then
-				bg[i].tex:SetTexCoord(unpack(data['inactive'][2]))
+			if playerClass == "PALADIN" then
+				texture:SetVertexColor(unpack(cfg.colors.power.HOLY_POWER))
+			end
+
+			local background = self:CreateTexture(nil, "ARTWORK")
+			background:SetAllPoints(texture)
+			background:SetTexture(data.inactive[1])
+			if data.inactive[2] then
+				background:SetTexCoord(unpack(data.inactive[2]))
+			end
+			texture.bg = background
+
+			if index == 1 then
+				texture:SetPoint("TOPLEFT", self, "BOTTOMRIGHT", -1*(data.size[1] or 28)*5, 0)
 			else
-				bg[i].tex:SetTexCoord(0, 1, 0, 1)
-			end
-			bg[i].tex:SetAllPoints(bg[i])
-
-			if i == 1 then
-				bg[i]:SetPoint("TOPLEFT", self, "BOTTOMRIGHT", -1*(data.size[1] or 28)*5, 0)
-			else
-				bg[i]:SetPoint("LEFT", bg[i - 1], "RIGHT", 0, 0)
+				texture:SetPoint("LEFT", self.ClassIcons[index - 1], "RIGHT", 0, 0)
 			end
 
-			self.ClassIcons[i] = bg[i]:CreateTexture(nil, "OVERLAY")
-			self.ClassIcons[i]:SetTexture(data['active'][1])
-			if data['active'][2] then
-				self.ClassIcons[i]:SetTexCoord(unpack(data['active'][2]))
-			else
-				self.ClassIcons[i]:SetTexCoord(0, 1, 0, 1)
-			end
-			self.ClassIcons[i]:SetAllPoints(bg[i])
-
-			-- need access to the background in the PostUpdate function
-			self.ClassIcons[i].bg = bg[i].tex
-
-			if initClassSingleIcon then
-				initClassSingleIcon(self, i)
-			end
-			if initClassIconAnimation then
-				initClassIconAnimation(self, i)
-			end
+			self.ClassIcons[index] = texture
+			if initClassIconAnimation then initClassIconAnimation(self.ClassIcons, index) end
 		end
 
-		self.ClassIcons.PostUpdate = function(_, current, max)
-			for i = 1, 5 do
-				if i > max then
-					self.ClassIcons[i]:Hide()
-					self.ClassIcons[i].bg:Hide()
-				else
-					self.ClassIcons[i].bg:Show()
+		self.ClassIcons.PostUpdate = function(self, current, max, maxHasChanged)
+			if maxHasChanged then
+				local mine, anchor, yours = self[1]:GetPoint()
+				self[1]:SetPoint(mine, anchor, yours, -1*(data.size[1] or 28)*max, 0)
+				for i = 1, 5 do
+					if i <= max then self[i].bg:Show() else self[i].bg:Hide() end
 				end
 			end
 			if updateClassIconAnimation then
