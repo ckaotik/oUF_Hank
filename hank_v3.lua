@@ -886,6 +886,7 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 			shinywheee:SetAllPoints()
 			shinywheee:SetAlpha(0)
 			shinywheee:Hide()
+			rune.shinywheee = shinywheee
 
 			local shine = shinywheee:CreateTexture(nil, "OVERLAY")
 			shine:SetAllPoints()
@@ -967,7 +968,7 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 					-- Rune ready: show all 16x16px, play animation
 					self.bg:SetSize(16, 16)
 					self.bg:SetTexCoord(0.5, 0.75, 0, 1)
-					shinywheee:Show()
+					self.shinywheee:Show()
 				else
 					-- Dot distance from top & bottom of texture: 4px
 					self.bg:SetSize(16, 4 + 8 * val / 10)
@@ -1158,7 +1159,7 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 				if playerClass == "DRUID" then
 					fill:SetVertexColor(unpack(cfg.colors.power.ECLIPSE.SOLAR))
 				elseif playerClass == "DEATHKNIGHT" then
-					fill:SetVertexColor(unpack(cfg.colors.power.runes[4]))
+					fill:SetVertexColor(unpack(cfg.colors.runes[4]))
 				end
 				totem:SetPoint("TOPRIGHT", self, "BOTTOMRIGHT", -1 * data.size[1] * (index - 1), -24)
 			end
