@@ -3,7 +3,7 @@ local cfg = oUF_Hank_config
 
 -- GLOBALS: oUF_player, oUF_pet, oUF_target, oUF_focus
 -- GLOBALS: _G, MIRRORTIMER_NUMTIMERS, SPELL_POWER_HOLY_POWER, MAX_TOTEMS, MAX_COMBO_POINTS, DebuffTypeColor
--- GLOBALS: ToggleDropDownMenu, UnitIsUnit, GetTime, AnimateTexCoords, GetEclipseDirection, MirrorTimerColors, GetSpecialization, UnitHasVehicleUI, UnitHealth, UnitHealthMax, UnitPower, UnitIsDead, UnitIsGhost, UnitIsConnected, UnitAffectingCombat, GetLootMethod, UnitIsGroupLeader, UnitIsPVPFreeForAll, UnitIsPVP, UnitInRaid, IsResting, UnitAura, UnitCanAttack, UnitIsGroupAssistant, GetRuneCooldown, UnitClass, CancelUnitBuff, CreateFrame, IsAddOnLoaded, UnitFrame_OnEnter, UnitFrame_OnLeave
+-- GLOBALS: UnitIsUnit, GetTime, AnimateTexCoords, GetEclipseDirection, MirrorTimerColors, GetSpecialization, UnitHasVehicleUI, UnitHealth, UnitHealthMax, UnitPower, UnitIsDead, UnitIsGhost, UnitIsConnected, UnitAffectingCombat, GetLootMethod, UnitIsGroupLeader, UnitIsPVPFreeForAll, UnitIsPVP, UnitInRaid, IsResting, UnitAura, UnitCanAttack, UnitIsGroupAssistant, GetRuneCooldown, UnitClass, CancelUnitBuff, CreateFrame, IsAddOnLoaded, UnitFrame_OnEnter, UnitFrame_OnLeave
 local upper, strlen, strsub, gmatch, match = string.upper, string.len, string.sub, string.gmatch, string.match
 local unpack, pairs, ipairs, select, tinsert = unpack, pairs, ipairs, select, table.insert
 local ceil, floor = math.ceil, math.floor
@@ -78,22 +78,6 @@ fntSmall:SetShadowOffset(1, -1)
 local canDispel = {}
 
 -- Functions -------------------------------------
--- Unit menu
-oUF_Hank.menu = function(self)
-	local unit = self.unit:sub(1, -2)
-	local cunit = self.unit:gsub("(.)", upper, 1)
-
-	-- Swap menus in vehicle
-	if self == oUF_player and cunit=="Vehicle" then cunit = "Player" end
-	if self == oUF_pet and cunit=="Player" then cunit = "Pet" end
-
-	if unit == "party" or unit == "partypet" then
-		ToggleDropDownMenu(nil, nil, _G["PartyMemberFrame"..self.id.."DropDown"], "cursor", 0, 0)
-	elseif _G[cunit.."FrameDropDown"] then
-		ToggleDropDownMenu(nil, nil, _G[cunit.."FrameDropDown"], "cursor", 0, 0)
-	end
-end
-
 -- Party frames be gone!
 oUF_Hank.HideParty = function()
 	for i = 1, 4 do
@@ -533,10 +517,7 @@ end
 oUF_Hank.sharedStyle = function(self, unit, isSingle)
 	self:SetScript("OnEnter", UnitFrame_OnEnter)
 	self:SetScript("OnLeave", UnitFrame_OnLeave)
-
-	self.menu = oUF_Hank.menu
 	self:RegisterForClicks("AnyDown")
-	self:SetAttribute("*type2", "menu")
 
 	self.colors = cfg.colors
 
