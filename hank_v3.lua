@@ -1,8 +1,7 @@
-local _, oUF_Hank = ...
+local addonName, oUF_Hank, _ = ...
 local cfg = oUF_Hank_config
 
--- GLOBALS: oUF_player, oUF_pet, oUF_target, oUF_focus
--- GLOBALS: _G, MIRRORTIMER_NUMTIMERS, SPELL_POWER_HOLY_POWER, MAX_TOTEMS, MAX_COMBO_POINTS, DebuffTypeColor
+-- GLOBALS: _G, oUFHankDB, oUF, MIRRORTIMER_NUMTIMERS, SPELL_POWER_HOLY_POWER, MAX_TOTEMS, MAX_COMBO_POINTS, DebuffTypeColor
 -- GLOBALS: UnitIsUnit, GetTime, AnimateTexCoords, GetEclipseDirection, MirrorTimerColors, GetSpecialization, UnitHasVehicleUI, UnitHealth, UnitHealthMax, UnitPower, UnitIsDead, UnitIsGhost, UnitIsConnected, UnitAffectingCombat, GetLootMethod, UnitIsGroupLeader, UnitIsPVPFreeForAll, UnitIsPVP, UnitInRaid, IsResting, UnitAura, UnitCanAttack, UnitIsGroupAssistant, GetRuneCooldown, UnitClass, CancelUnitBuff, CreateFrame, IsAddOnLoaded, UnitFrame_OnEnter, UnitFrame_OnLeave
 local upper, strlen, strsub, gmatch, match = string.upper, string.len, string.sub, string.gmatch, string.match
 local unpack, pairs, ipairs, select, tinsert = unpack, pairs, ipairs, select, table.insert
@@ -109,7 +108,7 @@ oUF_Hank.AdjustMirrorBars = function()
 		local text = _G["MirrorTimer" .. i .. "Text"]
 
 		mirror:ClearAllPoints()
-		mirror:SetPoint("BOTTOM", (i == 1) and oUF_player.Castbar or _G["MirrorTimer" .. i - 1], "TOP", 0, 5 + ((i == 1) and 5 or 0))
+		mirror:SetPoint("BOTTOM", (i == 1) and _G["oUF_HankPlayer"].Castbar or _G["MirrorTimer" .. i - 1], "TOP", 0, 5 + ((i == 1) and 5 or 0))
 		mirror:SetSize(cfg.CastbarSize[1], 12)
 		statusbar:SetStatusBarTexture(cfg.CastbarTexture)
 		statusbar:SetAllPoints(mirror)
@@ -173,9 +172,9 @@ oUF_Hank.UpdateHealth = function(self)
 					self.healthFill[5 - i]:Hide()
 				else
 					local digit
-					if self == oUF_player then
+					if self.unit == "player" then
 						digit = strsub(hPerc , -i, -i)
-					elseif self == oUF_target or self == oUF_focus then
+					elseif self.unit == "target" or self.unit == "focus" then
 						digit = strsub(hPerc , i, i)
 					end
 					self.health[5 - i]:SetSize(oUF_Hank.digitTexCoords[digit][2], oUF_Hank.digitTexCoords["height"])
@@ -187,9 +186,9 @@ oUF_Hank.UpdateHealth = function(self)
 				end
 			end
 
-			if self == oUF_player then
+			if self.unit == "player" then
 				self.power:SetPoint("BOTTOMRIGHT", self.health[5 - len], "BOTTOMLEFT", -5, 0)
-			elseif self == oUF_target or self == oUF_focus then
+			elseif self.unit == "target" or self.unit == "focus" then
 				self.power:SetPoint("BOTTOMLEFT", self.health[5 - len], "BOTTOMRIGHT", 5, 0)
 			end
 		end
@@ -209,9 +208,9 @@ oUF_Hank.UpdateHealth = function(self)
 			self.health[4]:SetTexCoord(oUF_Hank.digitTexCoords[status][1] / oUF_Hank.digitTexCoords["texWidth"], (oUF_Hank.digitTexCoords[status][1] + oUF_Hank.digitTexCoords[status][2]) / oUF_Hank.digitTexCoords["texWidth"], 1 / oUF_Hank.digitTexCoords["texHeight"], (1 + oUF_Hank.digitTexCoords["height"]) / oUF_Hank.digitTexCoords["texHeight"])
 			self.health[4]:Show()
 
-			if self == oUF_player then
+			if self.unit == "player" then
 				self.power:SetPoint("BOTTOMRIGHT", self.health[4], "BOTTOMLEFT", -5, 0)
-			elseif self == oUF_target or self == oUF_focus then
+			elseif self.unit == "target" or self.unit == "focus" then
 				self.power:SetPoint("BOTTOMLEFT", self.health[4], "BOTTOMRIGHT", 5, 0)
 			end
 		end
@@ -1452,77 +1451,110 @@ oUF_Hank.sharedStyle = function(self, unit, isSingle)
 	elseif unit:find("boss") then
 		self:SetSize(250, 50)
 	end
-
 end
 
--- custom modifications hooks --------------------------
+local function Initialize()
+	if not oUFHankDB then oUFHankDB = {} end
+	local db = oUFHankDB
 
-local modList
+	local Movable = LibStub('LibMovable-1.0')
 
-for modName, modHooks in pairs(oUF_Hank_hooks) do
-
-	local modErr = false
-	local numHooks = 0
-
-	for k, v in pairs(modHooks) do
-		numHooks = numHooks + 1
-		local success, ret = pcall(hooksecurefunc, oUF_Hank, k, v)
-		if not success then
-			modErr = true
-			DEFAULT_CHAT_FRAME:AddMessage("oUF_Hank: Couldn't create hook for function " .. k .. "() in |cFFFF5033" .. modName .. "|r: \"" .. ret .. "\"", cfg.colors.text[1], cfg.colors.text[2], cfg.colors.text[3])
-		end
-	end
-
-	if numHooks > 0 then
-		if not modErr then
-			modList = (modList or "") .. "|cFFFFFFFF" .. modName .. "|r, "
+	_G.SLASH_OUFHANK1 = "/hank"
+	_G.SLASH_OUFHANK2 = "/oufhank"
+	SlashCmdList.OUFHANK = function()
+		if Movable.IsLocked(addonName) then
+			Movable.Unlock(addonName)
 		else
-			modList = (modList or "") .. "|cFFFF5033" .. modName .. " (see errors)|r, "
+			Movable.Lock(addonName)
 		end
 	end
 
+	-- custom modifications hooks --------------------------
+	local modList
+	for modName, modHooks in pairs(oUF_Hank_hooks) do
+		local modErr = false
+		local numHooks = 0
+
+		for k, v in pairs(modHooks) do
+			numHooks = numHooks + 1
+			local success, ret = pcall(hooksecurefunc, oUF_Hank, k, v)
+			if not success then
+				modErr = true
+				DEFAULT_CHAT_FRAME:AddMessage("oUF_Hank: Couldn't create hook for function " .. k .. "() in |cFFFF5033" .. modName .. "|r: \"" .. ret .. "\"", cfg.colors.text[1], cfg.colors.text[2], cfg.colors.text[3])
+			end
+		end
+
+		if numHooks > 0 then
+			if not modErr then
+				modList = (modList or "") .. "|cFFFFFFFF" .. modName .. "|r, "
+			else
+				modList = (modList or "") .. "|cFFFF5033" .. modName .. " (see errors)|r, "
+			end
+		end
+	end
+
+	if modList then
+		-- cfg.colors.text[1], cfg.colors.text[2], cfg.colors.text[3]
+		DEFAULT_CHAT_FRAME:AddMessage("oUF_Hank: Applied custom modifications: " .. strsub(modList, 1, -3), cfg.colors.text[1], cfg.colors.text[2], cfg.colors.text[3])
+		modList = nil
+	end
+
+	-- Frame creation --------------------------------
+	local style, unitFrame = 'Hank', nil
+	oUF:RegisterStyle(style, oUF_Hank.sharedStyle)
+	oUF:SetActiveStyle(style)
+
+	local frames = {
+		{ "player",             "RIGHT",  "UIParent", "CENTER", -cfg.FrameMargin[1], -cfg.FrameMargin[2] },
+		{ "target",             "LEFT",   "UIParent", "CENTER",  cfg.FrameMargin[1], -cfg.FrameMargin[2] },
+		{ "focus",              "CENTER", "UIParent", "CENTER", -cfg.FocusFrameMargin[1], -cfg.FocusFrameMargin[2] },
+		{ "boss1",              "RIGHT",  "UIParent", cfg.BossFrameMargin[1], - cfg.BossFrameMargin[2] },
+		{ "pet",                "BOTTOMRIGHT", "oUF_"..style.."Player", "TOPRIGHT" },
+		{ "targettarget",       "BOTTOMLEFT",  "oUF_"..style.."Target", "TOPLEFT" },
+		{ "targettargettarget", "BOTTOMLEFT",  "oUF_"..style.."TargetTarget", "TOPLEFT" },
+		{ "focustarget",        "BOTTOMLEFT",  "oUF_"..style.."Focus", "TOPLEFT", 0, 5 },
+	}
+	for i = 2, MAX_BOSS_FRAMES do
+		table.insert(frames, { "boss"..i,  "TOPRIGHT", "oUF_"..style.."Boss"..(i-1), "BOTTOMRIGHT", 0, -5 })
+	end
+
+	if not db.position then db.position = {} end
+	for _, frameInfo in ipairs(frames) do
+		local unit, anchor = frameInfo[1], frameInfo[3]
+		local unitFrame = oUF:Spawn(unit)
+		      unitFrame:SetPoint( select(2, unpack(frameInfo)) )
+
+		if unit == "focus" then
+			unitFrame:SetScale(cfg.FrameScale * cfg.FocusFrameScale)
+		elseif unit == "focustarget" then
+			unitFrame:SetScale(cfg.FrameScale * cfg.FocusFrameScale * (cfg.FocusFrameScale <= 0.7 and 1.25 or 1))
+		elseif unit:match("^boss%d+$") then
+			unitFrame:SetScale(cfg.FrameScale * cfg.BossFrameScale)
+		else
+			unitFrame:SetScale(cfg.FrameScale)
+		end
+
+		if not db.position[unit] then db.position[unit] = {} end
+		Movable.RegisterMovable(addonName, unitFrame, db.position[unit])
+	end
+
+	if cfg.HideParty then oUF_Hank.HideParty() end
+	if cfg.Castbar then oUF_Hank.AdjustMirrorBars() end
+	if cfg.RangeFade and not IsAddOnLoaded("oUF_SpellRange") then
+		DEFAULT_CHAT_FRAME:AddMessage("oUF_Hank: Please download and install oUF_SpellRange before enabling range checks!", cfg.colors.text[1], cfg.colors.text[2], cfg.colors.text[3])
+	end
+
+	-- Call for custom_modifications
+	oUF_Hank.PostSpawnFrames(oUF_Hank)
 end
 
-if modList then
-	DEFAULT_CHAT_FRAME:AddMessage("oUF_Hank: Applied custom modifications: " .. strsub(modList, 1, -3), cfg.colors.text[1], cfg.colors.text[2], cfg.colors.text[3])
-	modList = nil
+-- postpone everything until we are fully loaded
+local frame = CreateFrame("Frame")
+local function eventHandler(frame, event, arg1, ...)
+	if event == 'ADDON_LOADED' and arg1 == addonName then
+		Initialize()
+		frame:UnregisterEvent(event)
+	end
 end
-
--- Frame creation --------------------------------
-
-oUF:RegisterStyle("Hankv3", oUF_Hank.sharedStyle)
-oUF:SetActiveStyle("Hankv3")
-oUF:Spawn("player", "oUF_player"):SetPoint("RIGHT", UIParent, "CENTER", -cfg.FrameMargin[1], -cfg.FrameMargin[2])
-oUF:Spawn("pet", "oUF_pet"):SetPoint("BOTTOMRIGHT", oUF_player, "TOPRIGHT")
-oUF:Spawn("target", "oUF_target"):SetPoint("LEFT", UIParent, "CENTER", cfg.FrameMargin[1], -cfg.FrameMargin[2])
-oUF:Spawn("targettarget", "oUF_ToT"):SetPoint("BOTTOMLEFT", oUF_target, "TOPLEFT")
-oUF:Spawn("targettargettarget", "oUF_ToTT"):SetPoint("BOTTOMLEFT", oUF_ToT, "TOPLEFT")
-oUF:Spawn("focus", "oUF_focus"):SetPoint("CENTER", UIParent, "CENTER", -cfg.FocusFrameMargin[1], -cfg.FocusFrameMargin[2])
-oUF:Spawn("focustarget", "oUF_ToF"):SetPoint("BOTTOMLEFT", oUF_focus, "TOPLEFT", 0, 5)
-
-for i = 1, MAX_BOSS_FRAMES do
-	oUF:Spawn("boss" .. i, "oUF_boss" .. i):SetPoint("RIGHT", UIParent, cfg.BossFrameMargin[1], -55 * (i - 1) - cfg.BossFrameMargin[2])
-	_G["oUF_boss" .. i]:SetScale(cfg.FrameScale * cfg.BossFrameScale)
-end
-
-oUF_player:SetScale(cfg.FrameScale)
-oUF_pet:SetScale(cfg.FrameScale)
-oUF_target:SetScale(cfg.FrameScale)
-oUF_ToT:SetScale(cfg.FrameScale)
-oUF_ToTT:SetScale(cfg.FrameScale)
-oUF_focus:SetScale(cfg.FrameScale * cfg.FocusFrameScale)
-if cfg.FocusFrameScale <= 0.7 then
-	oUF_ToF:SetScale(cfg.FrameScale * cfg.FocusFrameScale * 1.25)
-else
-	oUF_ToF:SetScale(cfg.FrameScale * cfg.FocusFrameScale)
-end
-
-if cfg.HideParty then oUF_Hank.HideParty() end
-if cfg.Castbar then oUF_Hank.AdjustMirrorBars() end
-
-if cfg.RangeFade and not IsAddOnLoaded("oUF_SpellRange") then
-	DEFAULT_CHAT_FRAME:AddMessage("oUF_Hank: Please download and install oUF_SpellRange before enabling range checks!", cfg.colors.text[1], cfg.colors.text[2], cfg.colors.text[3])
-end
-
--- Call for custom_modifications
-oUF_Hank.PostSpawnFrames(oUF_Hank)
+frame:SetScript("OnEvent", eventHandler)
+frame:RegisterEvent("ADDON_LOADED")
