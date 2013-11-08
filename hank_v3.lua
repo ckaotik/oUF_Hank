@@ -172,7 +172,7 @@ oUF_Hank.UpdateHealth = function(self)
 					self.healthFill[5 - i]:Hide()
 				else
 					local digit
-					if self.unit == "player" then
+					if self.unit == "player" or self.unit == "vehicle" then
 						digit = strsub(hPerc , -i, -i)
 					elseif self.unit == "target" or self.unit == "focus" then
 						digit = strsub(hPerc , i, i)
